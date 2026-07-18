@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StockLedger — Inventory & Sales</title>
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="style.css" rel="stylesheet"></>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <!-- Chart.js (kept for revenue chart only) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js">
+    </script>
+
+    <!-- Firebase v10 compat -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js">
+    </script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js">
+    </script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js">
+    </script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js">
+    </script>
+
+</head>
+<body>
+
+    <!-- ===== LOADING ===== -->
+    <div id="loadingOverlay" style="display:none">
+        <div class="box">
+            <div class="spinner-border text-success" role="status"></div>
+            <span id="loadingText">Loading…</span>
+        </div>
+    </div>
+
+    <!-- ===== TOASTS ===== -->
+    <div id="toastStack"></div>
+
+    <!-- ===== AUTH ===== -->
+    <div id="authScreen">
+        <div class="auth-card">
+            <div class="auth-brand">
+                <div class="glyph"><i class="bi bi-boxes"></i></div>
+                <div class="word">Stock<span>Ledger</span></div>
+            </div>
+            <div id="loginPane">
+                <h5 class="mb-1">Sign in</h5>
+                <p class="text-muted small mb-3">Use the account your admin created.</p>
+                <form id="loginForm">
+                    <div class="mb-3">
+                        <label class="form-label small">Email</label>
+                        <input type="email" class="form-control" id="loginEmail" required autocomplete="username" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small">Password</label>
+                        <input type="password" class="form-control" id="loginPassword" required autocomplete="current-password" />
+                    </div>
+                    <div id="loginError" class="text-danger small mb-2" style="display:none"></div>
+                    <button type="submit" class="btn btn-brand w-100" id="loginBtn">Sign in</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== APP SHELL ===== -->
+    <div id="appShell">
+        <!-- SIDEBAR -->
+        <aside class="sidebar" id="sidebar">
+            <div class="brand-row">
+                <div class="glyph"><i class="bi bi-boxes"></i></div>
+                <div class="word">Stock<span>Ledger</span></div>
+            </div>
+            <nav class="sidebar-nav" id="sidebarNav">
+                <div class="nav-section-label">Overview</div>
+                <a class="nav-link active" data-view="dashboard"><i class="bi bi-grid-1x2"></i> Dashboard</a>
+
+                <div class="nav-section-label">Operations</div>
+                <a class="nav-link" data-view="pos"><i class="bi bi-cart3"></i> Checkout / POS</a>
+                <a class="nav-link" data-view="products"><i class="bi bi-box-seam"></i> Products</a>
+                <a class="nav-link manager-only" data-view="stocklogs"><i class="bi bi-arrow-left-right"></i> Stock In / Out</a>
+                <a class="nav-link" data-view="sales"><i class="bi bi-receipt"></i> Sales Ledger</a>
+
+                <div class="nav-section-label manager-only">Insights</div>
+                <a class="nav-link manager-only" data-view="reports"><i class="bi bi-bar-chart"></i> Reports</a>
+
+                <div class="nav-section-label">Team</div>
+                <a class="nav-link" data-view="notes"><i class="bi bi-sticky"></i> Notes</a>
+
+                <div class="nav-section-label admin-only">Administration</div>
+                <a class="nav-link admin-only" data-view="users"><i class="bi bi-people"></i> User Management</a>
+                <a class="nav-link admin-only" data-view="settings"><i class="bi bi-gear"></i> System Settings</a>
+                <a class="nav-link admin-only" data-view="activity"><i class="bi bi-clock-history"></i> Activity Log</a>
+            </nav>
+            <div class="sidebar-foot">
+                <span>Signed in as <span id="sidebarUserName">—</span></span>
+                <button class="dark-toggle-btn" id="darkToggleBtn" title="Toggle dark mode"><i class="bi bi-moon"></i></button>
+            </div>
+        </aside>
+
+        <!-- MAIN -->
+        <div class="main-area">
+            <div class="topbar">
+                <div class="d-flex align-items-center gap-2 min-width-0">
+                    <button class="btn btn-sm btn-outline-secondary sidebar-toggle-btn" id="sidebarToggleBtn"><i class="bi bi-list"></i></button>
+                    <h1 class="page-title text-truncate" id="pageTitle">Dashboard</h1>
+                </div>
+                <div class="topbar-right">
+                    <div class="dropdown">
+                        <button class="bell-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-bell"></i>
+                            <span class="badge-count" id="lowStockBellCount" style="display:none">0</span>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end p-0" style="width:300px;max-width:90vw;">
+                            <div class="p-2 border-bottom fw-semibold small">Low stock alerts</div>
+                            <div id="lowStockDropdownList" style="max-height:280px;overflow-y:auto">
+                                <div class="p-3 text-muted small text-center">No low stock items.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dropdown">
+                        <div class="user-chip" data-bs-toggle="dropdown" aria-expanded="false">
+                            <div class="avatar" id="userAvatar">?</div>
+                            <div class="d-none d-sm-block">
+                                <div class="fw-semibold small" id="topbarUserName" style="line-height:1.1">—</div>
+                                <span class="role-pill" id="topbarRolePill">—</span>
+                            </div>
+                            <i class="bi bi-chevron-down small text-muted"></i>
+                        </div>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><span class="dropdown-item-text small text-muted" id="dropdownEmail">—</span></li>
+                            <li><hr class="dropdown-divider" /></li>
+                            <li><a class="dropdown-item" href="#" id="logoutBtn"><i class="bi bi-box-arrow-right me-2"></i>Sign out</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-pad">
+                <!-- ===== DASHBOARD ===== -->
+                <div class="app-view active" id="view-dashboard">
+                    <!-- Date filter row (admin only) -->
+                    <div class="row g-2 mb-3 admin-only">
+                        <div class="col-12">
+                            <div class="panel" style="border:none; box-shadow:none; background:transparent; padding:0;">
+                                <div class="d-flex flex-wrap align-items-center gap-2">
+                                    <label class="small fw-semibold me-1">Revenue period</label>
+                                    <input type="date" class="form-control form-control-sm" id="dashDateFrom" style="width:auto;min-width:130px;" />
+                                    <span class="text-muted small">to</span>
+                                    <input type="date" class="form-control form-control-sm" id="dashDateTo" style="width:auto;min-width:130px;" />
+                                    <button class="btn btn-sm btn-brand" id="dashApplyBtn"><i class="bi bi-funnel"></i> Apply</button>
+                                    <button class="btn btn-sm btn-outline-secondary" id="dashResetBtn"><i class="bi bi-arrow-counterclockwise"></i> Reset</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- KPI row -->
+                    <div class="row g-3 mb-3">
+                        <!-- Total Investment / Purchases (period) - label fixed -->
+                        <div class="col-12 col-lg-3 admin-only">
+                            <div class="kpi-card investment-highlight">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <div class="min-width-0 ">
+                                        <div class="kpi-label">Purchases (period)</div>
+                                        <div class="kpi-value " id="kpiInvestment">—</div>
+                                        <div class="small text-muted" style="font-size:.6rem;">cost of items received in this range</div>
+                                    </div>
+                                    <div class="kpi-icon investment-icon flex-shrink-0"><i class="bi bi-cash-stack"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Gross Profit (period) -->
+                        <div class="col-12 col-lg-3 admin-only">
+                            <div class="kpi-card kpi-amber">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <div class="min-width-0">
+                                        <div class="kpi-label">Gross Profit (period)</div>
+                                        <div class="kpi-value" id="kpiGrossProfit">—</div>
+                                        <div class="small text-muted" style="font-size:.6rem;">revenue – COGS</div>
+                                    </div>
+                                    <div class="kpi-icon flex-shrink-0" style="background:var(--amber-soft);color:#8a5f17"><i class="bi bi-piggy-bank"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Low stock -->
+                        <div class="col-6 col-lg-3">
+                            <div class="kpi-card kpi-amber">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <div class="min-width-0">
+                                        <div class="kpi-label">Low stock</div>
+                                        <div class="kpi-value" id="kpiLowStock">0</div>
+                                    </div>
+                                    <div class="kpi-icon flex-shrink-0" style="background:var(--amber-soft);color:#8a5f17"><i class="bi bi-exclamation-triangle"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Total Loss (period) -->
+                        <div class="col-12 col-lg-3 admin-only">
+                            <div class="kpi-card kpi-danger">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <div class="min-width-0">
+                                        <div class="kpi-label">Total Loss (period)</div>
+                                        <div class="kpi-value" id="kpiTotalLoss">—</div>
+                                    </div>
+                                    <div class="kpi-icon flex-shrink-0" style="background:var(--danger-soft);color:var(--danger)"><i class="bi bi-arrow-down-circle"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Revenue Chart + Gross Profit Chart (z.html style) side by side -->
+                    <div class="row g-3">
+                        <!-- Revenue Chart (Chart.js) -->
+                        <div class="col-lg-6 admin-only">
+                            <div class="panel h-100">
+                                <div class="panel-head"><h5><i class="bi bi-graph-up-arrow me-2 text-success"></i>Revenue trend</h5></div>
+                                <div class="panel-body">
+                                    <div class="chart-wrap" style="height:240px">
+                                        <canvas id="revenueChart"></canvas>
+                                        <div class="empty-state" id="revenueChartEmpty" style="display:none">
+                                            <i class="bi bi-graph-up"></i>No sales data for this period.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Gross Profit Chart — z.html style (pure canvas) -->
+                        <div class="col-lg-6 admin-only">
+                            <div class="panel h-100">
+                                <div class="panel-head">
+                                    <h5><i class="bi bi-piggy-bank me-2 text-warning"></i>Gross Profit trend</h5>
+                                    <span class="chart-total-label" id="gpChartTotal">TK. 0</span>
+                                </div>
+                                <div class="panel-body">
+                                    <div class="chart-wrap-dark" style="position:relative;width:100%;">
+                                        <div class="chart-wrap" style="height:200px;position:relative;">
+                                            <canvas id="grossProfitChartCanvas"></canvas>
+                                            <div class="empty-state" id="grossProfitChartEmpty" style="display:none;position:absolute;inset:0;background:var(--card);border-radius:var(--radius-sm);">
+                                                <i class="bi bi-piggy-bank"></i>No profit data for this period.
+                                            </div>
+                                        </div>
+                                        <div class="chart-day-labels" id="gpDayLabels">
+                                            <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Low stock watchlist + Stock movement summary (now date‑range aware) -->
+                    <div class="row mt-3">
+                        <div class="col-lg-4">
+                            <div class="panel h-100">
+                                <div class="panel-head"><h5><i class="bi bi-exclamation-diamond me-2 text-warning"></i>Low stock watchlist</h5></div>
+                                <div class="panel-body p-0" id="dashLowStockList" style="max-height:300px;overflow-y:auto">
+                                    <div class="empty-state py-4"><i class="bi bi-check2-circle"></i>All stock levels look healthy.</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-8">
+                            <div class="panel h-100">
+                                <div class="panel-head"><h5><i class="bi bi-arrow-left-right me-2 text-success"></i>Stock movement summary (period)</h5></div>
+                                <div class="panel-body" id="stockMovementSummary">
+                                    <div class="empty-state py-3"><i class="bi bi-arrow-left-right"></i> Not enough data yet.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== POS ===== -->
+                <div class="app-view" id="view-pos">
+                    <div class="pos-grid">
+                        <div class="panel">
+                            <div class="panel-head">
+                                <h5><i class="bi bi-search me-2 text-success"></i>Find products</h5>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <input type="text" class="form-control form-control-sm" style="max-width:180px;min-width:120px;" id="posSearch" placeholder="Search name or SKU…" />
+                                    <button class="btn btn-sm btn-outline-secondary" id="barcodeScanBtn"><i class="bi bi-qr-code"></i> Scan</button>
+                                </div>
+                            </div>
+                            <div class="panel-body">
+                                <div class="row g-2" id="posProductGrid"></div>
+                            </div>
+                        </div>
+                        <div class="panel">
+                            <div class="panel-head">
+                                <h5><i class="bi bi-cart3 me-2 text-success"></i>Cart</h5>
+                                <button class="btn btn-sm btn-outline-secondary" id="clearCartBtn"><i class="bi bi-x-lg"></i> Clear</button>
+                            </div>
+                            <div class="panel-body">
+                                <div id="cartLines"><div class="empty-state py-4"><i class="bi bi-cart-x"></i>Cart is empty. Tap a product to add it.</div></div>
+                                <hr />
+                                <div class="mb-2">
+                                    <label class="form-label small">Customer (optional)</label>
+                                    <input type="text" class="form-control form-control-sm" id="posCustomer" placeholder="Name or phone…" />
+                                </div>
+                                <div class="row g-2 mb-2">
+                                    <div class="col-6">
+                                        <label class="form-label small mb-1">Discount</label>
+                                        <div class="input-group input-group-sm">
+                                            <input type="number" min="0" step="0.01" class="form-control" id="posDiscount" value="0" />
+                                            <select class="form-select" id="posDiscountType" style="max-width:80px">
+                                                <option value="amount">Flat</option>
+                                                <option value="percent">%</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small mb-1">Amount tendered</label>
+                                        <input type="number" min="0" step="0.01" class="form-control form-control-sm" id="posTendered" placeholder="0.00" />
+                                    </div>
+                                </div>
+                                <div class="row g-2 mb-2">
+                                    <div class="col-6">
+                                        <label class="form-label small mb-1">Payment method</label>
+                                        <select class="form-select form-select-sm" id="posPaymentMethod">
+                                            <option value="Cash">Cash</option>
+                                            <option value="Card">Card</option>
+                                            <option value="Mobile Money">Mobile Money</option>
+                                            <option value="Credit">Credit</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small mb-1">&nbsp;</label>
+                                        <div class="d-flex align-items-center h-100">
+                                            <span class="small text-muted">Receipt # will be generated</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between small mb-1"><span>Subtotal</span><span class="mono" id="posSubtotal">0.00</span></div>
+                                <div class="d-flex justify-content-between small mb-1"><span>Discount</span><span class="mono" id="posDiscountOut">0.00</span></div>
+                                <div class="d-flex justify-content-between fw-bold mb-2"><span>Total due</span><span class="mono" id="posTotal">0.00</span></div>
+                                <div class="d-flex justify-content-between small mb-1 text-muted"><span>Change due</span><span class="mono" id="posChange">0.00</span></div>
+                                <div id="posWarning" class="alert alert-warning py-2 small mt-2" style="display:none"></div>
+                                <button class="btn btn-brand w-100 mt-2" id="completeSaleBtn"><i class="bi bi-check2-circle me-1"></i> Complete sale</button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Barcode modal -->
+                    <div class="modal fade" id="barcodeModal" tabindex="-1">
+                        <div class="modal-dialog modal-sm" style="max-width:420px;">
+                            <div class="modal-content" style="border-radius:16px;overflow:hidden;background:transparent;border:none;">
+                                <div class="modal-header" style="background:var(--card);border-bottom:1px solid var(--line);border-radius:16px 16px 0 0;">
+                                    <h5 class="modal-title"><i class="bi bi-upc-scan me-2 text-success"></i>Scan barcode</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body" style="padding:0;background:#000;border-radius:0 0 16px 16px;position:relative;" id="barcodeReader">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== PRODUCTS ===== -->
+                <div class="app-view" id="view-products">
+                    <div class="panel">
+                        <div class="panel-head">
+                            <h5><i class="bi bi-box-seam me-2 text-success"></i>Products</h5>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <input type="text" class="form-control form-control-sm" style="width:200px;max-width:100%;" id="productSearch" placeholder="Search products…" />
+                                <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#categoryModal"><i class="bi bi-tags"></i> Categories</button>
+                                <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#importModal"><i class="bi bi-upload"></i> Import</button>
+                                <button class="btn btn-sm btn-brand manager-only" data-bs-toggle="modal" data-bs-target="#productModal" id="openAddProductBtn"><i class="bi bi-plus-lg"></i> Add product</button>
+                            </div>
+                        </div>
+                        <div class="panel-body table-responsive">
+                            <table class="table app-table">
+                                <thead><tr><th>Image</th><th>Product</th><th>SKU</th><th>Category</th><th class="num">Price</th><th class="num">Stock</th><th>Status</th><th class="manager-only text-end">Actions</th></tr></thead>
+                                <tbody id="productsTableBody"></tbody>
+                            </table>
+                            <div class="empty-state" id="productsEmptyState" style="display:none"><i class="bi bi-box-seam"></i>No products yet.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== STOCK LOGS ===== -->
+                <div class="app-view manager-only" id="view-stocklogs">
+                    <div class="panel">
+                        <div class="panel-head">
+                            <h5><i class="bi bi-arrow-left-right me-2 text-success"></i>Stock in / out history</h5>
+                            <button class="btn btn-sm btn-brand" data-bs-toggle="modal" data-bs-target="#stockLogModal"><i class="bi bi-plus-lg"></i> Log stock movement</button>
+                        </div>
+                        <div class="panel-body table-responsive">
+                            <table class="table app-table">
+                                <thead><tr><th>Date</th><th>Product</th><th>Type</th><th class="num">Qty</th><th class="num">Unit Price</th><th class="num">New stock</th><th>By</th><th>Note</th></tr></thead>
+                                <tbody id="stockLogsTableBody"></tbody>
+                            </table>
+                            <div class="empty-state" id="stockLogsEmptyState" style="display:none"><i class="bi bi-arrow-left-right"></i>No stock movements recorded yet.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== SALES LEDGER ===== -->
+                <div class="app-view" id="view-sales">
+                    <div class="panel">
+                        <div class="panel-head">
+                            <h5><i class="bi bi-receipt me-2 text-success"></i>Sales ledger</h5>
+                            <button class="btn btn-sm btn-outline-secondary" id="exportSalesBtn"><i class="bi bi-download"></i> Export CSV</button>
+                        </div>
+                        <div class="panel-body table-responsive">
+                            <table class="table app-table">
+                                <thead><tr><th>Date</th><th>Receipt</th><th>Cashier</th><th class="num">Items</th><th class="num">Discount</th><th class="num">Total</th><th>Payment</th><th class="admin-only text-end">Actions</th></tr></thead>
+                                <tbody id="salesTableBody"></tbody>
+                            </table>
+                            <div class="empty-state" id="salesEmptyState" style="display:none"><i class="bi bi-receipt"></i>No sales recorded yet.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== REPORTS ===== -->
+                <div class="app-view manager-only" id="view-reports">
+                    <div class="panel mb-3">
+                        <div class="panel-head">
+                            <h5><i class="bi bi-calendar-range me-2 text-success"></i>Date range</h5>
+                            <div class="date-range-bar">
+                                <label class="small">From</label>
+                                <input type="date" class="form-control form-control-sm" id="reportDateFrom" />
+                                <label class="small">To</label>
+                                <input type="date" class="form-control form-control-sm" id="reportDateTo" />
+                                <button class="btn btn-sm btn-brand" id="reportApplyBtn"><i class="bi bi-funnel"></i> Apply</button>
+                                <button class="btn btn-sm btn-outline-secondary" id="reportResetBtn"><i class="bi bi-arrow-counterclockwise"></i> Reset</button>
+                                <button class="btn btn-sm btn-outline-secondary" id="exportReportBtn"><i class="bi bi-download"></i> Export CSV</button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Report KPIs -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-lg-3">
+                            <div class="kpi-card rep-investment-card">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <div class="min-width-0">
+                                        <div class="kpi-label">Purchases (period)</div>
+                                        <div class="kpi-value" id="repInvestment">—</div>
+                                        <div class="small text-muted" style="font-size:.6rem;">cost of items received in this range</div>
+                                    </div>
+                                    <div class="kpi-icon flex-shrink-0" style="background:var(--brand-soft);color:var(--brand-dark)"><i class="bi bi-cash-stack"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-3">
+                            <div class="kpi-card">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <div class="min-width-0">
+                                        <div class="kpi-label">Gross Profit</div>
+                                        <div class="kpi-value" id="repProfit">—</div>
+                                    </div>
+                                    <div class="kpi-icon flex-shrink-0" style="background:var(--amber-soft);color:#8a5f17"><i class="bi bi-piggy-bank"></i></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-6 col-lg-3">
+                            <div class="kpi-card">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <div class="min-width-0">
+                                        <div class="kpi-label">Total Revenue</div>
+                                        <div class="kpi-value" id="repRevenue">—</div>
+                                    </div>
+                                    <div class="kpi-icon flex-shrink-0" style="background:var(--info-soft);color:var(--info)"><i class="bi bi-graph-up-arrow"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="kpi-card">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <div class="min-width-0">
+                                        <div class="kpi-label">Total Sales</div>
+                                        <div class="kpi-value" id="repCount">0</div>
+                                    </div>
+                                    <div class="kpi-icon flex-shrink-0" style="background:var(--brand-soft);color:var(--brand-dark)"><i class="bi bi-receipt"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6 col-lg-3">
+                            <div class="kpi-card kpi-neutral">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <div class="min-width-0">
+                                        <div class="kpi-label">COGS (period)</div>
+                                        <div class="kpi-value" id="repCogsKpi">—</div>
+                                    </div>
+                                    <div class="kpi-icon flex-shrink-0" style="background:var(--brand-soft);color:var(--brand-dark)"><i class="bi bi-box-seam"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="kpi-card kpi-neutral">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <div class="min-width-0">
+                                        <div class="kpi-label">Avg. Sale Value</div>
+                                        <div class="kpi-value" id="repAvg">—</div>
+                                    </div>
+                                    <div class="kpi-icon flex-shrink-0" style="background:var(--info-soft);color:var(--info)"><i class="bi bi-calculator"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-3">
+                            <div class="kpi-card kpi-danger">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <div class="min-width-0">
+                                        <div class="kpi-label">Total Loss (sales + damages)</div>
+                                        <div class="kpi-value" id="repTotalLoss">—</div>
+                                    </div>
+                                    <div class="kpi-icon flex-shrink-0" style="background:var(--danger-soft);color:var(--danger)"><i class="bi bi-arrow-down-circle"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="kpi-card kpi-amber">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <div class="min-width-0">
+                                        <div class="kpi-label">Net Profit Margin</div>
+                                        <div class="kpi-value" id="repMargin">—</div>
+                                    </div>
+                                    <div class="kpi-icon flex-shrink-0" style="background:var(--amber-soft);color:#8a5f17"><i class="bi bi-percent"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="kpi-card">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <div class="min-width-0">
+                                        <div class="kpi-label">ROI</div>
+                                        <div class="kpi-value" id="repRoi">—</div>
+                                    </div>
+                                    <div class="kpi-icon flex-shrink-0" style="background:var(--brand-soft);color:var(--brand-dark)"><i class="bi bi-rocket-takeoff"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-head"><h5><i class="bi bi-trophy me-2 text-warning"></i>Top-selling products</h5></div>
+                        <div class="panel-body table-responsive">
+                            <table class="table app-table"><thead><tr><th>Product</th><th class="num">Units sold</th><th class="num">Revenue</th><th class="num">COGS</th><th class="num">Profit</th></tr></thead><tbody id="topProductsBody"></tbody></table>
+                            <div class="empty-state" id="topProductsEmpty" style="display:none"><i class="bi bi-bar-chart"></i>Not enough sales data yet.</div>
+                        </div>
+                    </div>
+                    <div class="panel mt-3">
+                        <div class="panel-head"><h5><i class="bi bi-clipboard-data me-2 text-success"></i>Profit & Loss (period)</h5></div>
+                        <div class="panel-body">
+                            <div class="row g-2">
+                                <div class="col-4"><span class="text-muted">Revenue</span><br /><strong id="repRevenueDetailed">—</strong></div>
+                                <div class="col-4"><span class="text-muted">COGS</span><br /><strong id="repCogs">—</strong></div>
+                                <div class="col-4"><span class="text-muted">Gross Profit</span><br /><strong id="repProfitLoss">—</strong></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="panel mt-3">
+                        <div class="panel-head"><h5><i class="bi bi-tags me-2 text-success"></i>Sales by category</h5></div>
+                        <div class="panel-body table-responsive">
+                            <table class="table app-table"><thead><tr><th>Category</th><th class="num">Units sold</th><th class="num">Revenue</th><th class="num">COGS</th><th class="num">Profit</th></tr></thead><tbody id="categorySalesBody"></tbody></table>
+                        </div>
+                    </div>
+                    <div class="panel mt-3">
+                        <div class="panel-head"><h5><i class="bi bi-cash-coin me-2 text-success"></i>Investment breakdown</h5></div>
+                        <div class="panel-body table-responsive">
+                            <table class="table app-table">
+                                <thead><tr><th>Product</th><th class="num">Stock</th><th class="num">Unit Cost</th><th class="num">Total Investment</th></tr></thead>
+                                <tbody id="investmentBreakdownBody"></tbody>
+                            </table>
+                            <div class="empty-state" id="investmentBreakdownEmpty" style="display:none"><i class="bi bi-cash-stack"></i>No products with cost data.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== NOTES ===== -->
+                <div class="app-view" id="view-notes">
+                    <div class="panel mb-3">
+                        <div class="panel-head">
+                            <h5><i class="bi bi-sticky me-2"></i>Team notes</h5>
+                            <button class="btn btn-sm btn-brand" data-bs-toggle="modal" data-bs-target="#addNoteModal"><i class="bi bi-plus-lg"></i> Add note</button>
+                        </div>
+                        <div class="panel-body"><div id="notesList" class="row g-3"><div class="col-12 empty-state"><i class="bi bi-sticky"></i>No notes yet. Add one to share with the team.</div></div></div>
+                    </div>
+                </div>
+
+                <!-- ===== USER MANAGEMENT ===== -->
+                <div class="app-view admin-only" id="view-users">
+                    <div class="panel">
+                        <div class="panel-head">
+                            <h5><i class="bi bi-people me-2 text-success"></i>Team accounts</h5>
+                            <button class="btn btn-sm btn-brand" data-bs-toggle="modal" data-bs-target="#addUserModal"><i class="bi bi-person-plus"></i> Add team member</button>
+                        </div>
+                        <div class="panel-body table-responsive">
+                            <table class="table app-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th class="text-end">Actions</th></tr></thead><tbody id="usersTableBody"></tbody></table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== SETTINGS ===== -->
+                <div class="app-view admin-only" id="view-settings">
+                    <div class="panel" style="max-width:620px;">
+                        <div class="panel-head"><h5><i class="bi bi-gear me-2 text-success"></i>System settings</h5></div>
+                        <div class="panel-body">
+                            <form id="settingsForm">
+                                <div class="mb-3"><label class="form-label small">Shop / business name</label><input type="text" class="form-control" id="settingShopName" /></div>
+                                <div class="mb-3"><label class="form-label small">Currency symbol</label><input type="text" class="form-control" id="settingCurrency" maxlength="5" style="max-width:120px" /></div>
+                                <div class="mb-3"><label class="form-label small">Low-stock alert threshold (units)</label><input type="number" min="0" class="form-control" id="settingThreshold" style="max-width:160px" /></div>
+                                <button type="submit" class="btn btn-brand"><i class="bi bi-save me-1"></i>Save settings</button>
+                            </form>
+
+                            <!-- DANGER ZONE: Delete all data -->
+                            <div class="danger-zone">
+                                <h6 class="danger-zone-title"><i class="bi bi-exclamation-triangle-fill me-1"></i> Danger Zone</h6>
+                                <p class="small text-muted">Permanently delete ALL data: products, sales, stock logs, notes, users, activity logs, and settings. This action cannot be undone.</p>
+                                <button class="btn btn-danger" id="deleteAllDataBtn"><i class="bi bi-trash3 me-1"></i> Delete All Data</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== ACTIVITY LOG ===== -->
+                <div class="app-view admin-only" id="view-activity">
+                    <div class="panel">
+                        <div class="panel-head"><h5><i class="bi bi-clock-history me-2 text-success"></i>System activity log</h5></div>
+                        <div class="panel-body table-responsive">
+                            <table class="table app-table"><thead><tr><th>Date</th><th>User</th><th>Action</th><th>Detail</th></tr></thead><tbody id="activityTableBody"></tbody></table>
+                            <div class="empty-state" id="activityEmptyState" style="display:none"><i class="bi bi-clock-history"></i>No activity recorded yet.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODALS ===== -->
+
+    <!-- Product Modal (with image upload) -->
+    <div class="modal fade" id="productModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="productForm">
+                    <div class="modal-header"><h5 class="modal-title" id="productModalTitle">Add product</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-body">
+                        <input type="hidden" id="productId" />
+                        <div class="mb-2"><label class="form-label small">Product name</label><input type="text" class="form-control" id="productName" required /></div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6"><label class="form-label small">SKU</label><input type="text" class="form-control" id="productSku" required /></div>
+                            <div class="col-6"><label class="form-label small">Category</label><input type="text" class="form-control" id="productCategory" list="categoryList" required /><datalist id="categoryList"></datalist></div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6"><label class="form-label small">Sell price</label><input type="number" min="0" step="0.01" class="form-control" id="productPrice" required /></div>
+                            <div class="col-6 admin-only"><label class="form-label small">Cost price</label><input type="number" min="0" step="0.01" class="form-control" id="productCost" /></div>
+                        </div>
+                        <div class="mb-2 admin-only">
+                            <label class="form-label small">Low-stock threshold (optional)</label>
+                            <input type="number" min="0" class="form-control" id="productThreshold" placeholder="Uses system default" />
+                        </div>
+                        <!-- Image upload -->
+                        <div class="mb-2">
+                            <label class="form-label small">Product image</label>
+                            <div class="d-flex align-items-start gap-2 flex-wrap">
+                                <div class="img-preview-wrap" id="productImagePreviewWrap" style="display:none;">
+                                    <img id="productImagePreview" src="" alt="Product image" />
+                                    <button type="button" class="btn-remove-img" id="removeProductImageBtn" title="Remove image"><i class="bi bi-x"></i></button>
+                                </div>
+                                <div>
+                                    <input type="file" class="form-control form-control-sm" id="productImageFile" accept="image/*" style="max-width:220px;" />
+                                    <div class="form-text small">Upload an image (JPG, PNG, WebP) — max 2MB</div>
+                                </div>
+                            </div>
+                            <input type="hidden" id="productImageUrl" />
+                        </div>
+                        <div id="productFormError" class="text-danger small mt-2" style="display:none"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-danger me-auto admin-only" id="deleteProductBtn" style="display:none"><i class="bi bi-trash"></i> Delete</button>
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-brand" id="saveProductBtn">Save product</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Modal -->
+    <div class="modal fade" id="categoryModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">Manage categories</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="d-flex gap-2 mb-3 flex-wrap">
+                        <input type="text" class="form-control form-control-sm" id="newCategoryName" placeholder="New category name" style="flex:1;min-width:120px;" />
+                        <button class="btn btn-sm btn-brand" id="addCategoryBtn"><i class="bi bi-plus"></i> Add</button>
+                    </div>
+                    <div id="categoryListContainer" class="d-flex flex-wrap gap-1"></div>
+                    <div id="categoryError" class="text-danger small mt-2" style="display:none"></div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div class="modal fade" id="importModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">Import products (CSV)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <p class="small text-muted">Upload a CSV with columns: name, sku, category, price, cost, lowStockThreshold</p>
+                    <div class="file-drop-zone" id="csvDropZone">
+                        <i class="bi bi-cloud-upload"></i>
+                        <span>Drop CSV file here or click to browse</span>
+                        <input type="file" id="csvFileInput" accept=".csv" style="display:none" />
+                    </div>
+                    <div id="importProgress" class="mt-2" style="display:none">
+                        <div class="progress"><div class="progress-bar" id="importProgressBar" style="width:0%">0%</div></div>
+                    </div>
+                    <div id="importResult" class="mt-2 small"></div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== STOCK LOG MODAL (ENHANCED with Dual Pricing) ===== -->
+    <div class="modal fade" id="stockLogModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="stockLogForm">
+                    <div class="modal-header"><h5 class="modal-title">Log stock movement</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-body">
+                        <div class="mb-2"><label class="form-label small">Product</label><select class="form-select" id="stockLogProduct" required></select></div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6"><label class="form-label small">Movement type</label>
+                                <select class="form-select" id="stockLogType">
+                                    <option value="in">Stock in (received)</option>
+                                    <option value="out">Stock out (manual removal)</option>
+                                    <option value="damage">Damage / loss</option>
+                                </select>
+                            </div>
+                            <div class="col-6"><label class="form-label small">Quantity</label><input type="number" min="1" class="form-control" id="stockLogQty" required /></div>
+                        </div>
+
+                        <!-- ===== DUAL PRICING STRATEGY ===== -->
+                        <div class="mb-2">
+                            <label class="form-label small">Pricing strategy</label>
+                            <div class="pricing-strategy-group" id="pricingStrategyGroup">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="pricingStrategy" id="strategyPerUnit" value="per-unit" checked />
+                                    <label class="form-check-label" for="strategyPerUnit">Per Unit</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="pricingStrategy" id="strategyBulk" value="bulk" />
+                                    <label class="form-check-label" for="strategyBulk">Bulk / Full Stock</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Per-unit price input -->
+                        <div class="row g-2 mb-2" id="perUnitPriceRow">
+                            <div class="col-6">
+                                <label class="form-label small">Unit price <span id="stockLogPriceLabel">(cost price)</span></label>
+                                <input type="number" min="0" step="0.01" class="form-control stock-log-price-input" id="stockLogPrice" placeholder="0.00" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">New stock after</label>
+                                <input type="text" class="form-control form-control-sm" id="stockLogNewStockPreview" readonly placeholder="—" />
+                            </div>
+                        </div>
+
+                        <!-- Bulk pricing row -->
+                        <div class="pricing-bulk-input mb-2" id="bulkPricingRow" style="display:none;">
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <label class="form-label small">Total bulk value</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text" id="bulkCurrencySymbol">$</span>
+                                        <input type="number" min="0" step="0.01" class="form-control" id="stockLogBulkTotal" placeholder="e.g. 500.00" />
+                                    </div>
+                                    <div class="form-text">Enter the total cost for the whole batch.</div>
+                                </div>
+                                <div class="col-6 d-flex flex-column justify-content-end">
+                                    <label class="form-label small">Calculated unit price</label>
+                                    <div class="calculated-unit-price" id="calculatedUnitPrice">—</div>
+                                    <div class="form-text small">Total / Quantity</div>
+                                    <input type="hidden" id="stockLogBulkUnitPrice" value="0" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sale price row – shown only for "in" type -->
+                        <div class="row g-2 mb-2" id="stockLogSalePriceRow" style="display:none;">
+                            <div class="col-6">
+                                <label class="form-label small">Sale price (optional)</label>
+                                <input type="number" min="0" step="0.01" class="form-control" id="stockLogSalePrice" placeholder="Leave blank to keep current" />
+                            </div>
+                            <div class="col-6">
+                                <!-- empty cell for alignment -->
+                            </div>
+                        </div>
+
+                        <div class="mb-2"><label class="form-label small">Note (optional)</label><textarea class="form-control" id="stockLogNote" rows="2"></textarea></div>
+                        <div id="stockLogError" class="text-danger small" style="display:none"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-brand" id="stockLogSubmitBtn">Save movement</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div class="modal fade" id="addUserModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="addUserForm">
+                    <div class="modal-header"><h5 class="modal-title">Add team member</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-body">
+                        <div class="mb-2"><label class="form-label small">Full name</label><input type="text" class="form-control" id="newUserName" required /></div>
+                        <div class="mb-2"><label class="form-label small">Email</label><input type="email" class="form-control" id="newUserEmail" required /></div>
+                        <div class="mb-2"><label class="form-label small">Temporary password</label><input type="text" class="form-control" id="newUserPassword" minlength="6" required /><div class="form-text">At least 6 characters. Share this securely.</div></div>
+                        <div class="mb-2"><label class="form-label small">Role</label><select class="form-select" id="newUserRole"><option value="staff">Staff</option><option value="manager">Manager</option><option value="admin">Admin</option></select></div>
+                        <div id="addUserError" class="text-danger small" style="display:none"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-brand" id="addUserSubmitBtn">Create account</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div class="modal fade" id="editUserModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="editUserForm">
+                    <div class="modal-header"><h5 class="modal-title">Edit team member</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-body">
+                        <input type="hidden" id="editUserId" />
+                        <p class="small text-muted mb-2" id="editUserLabel"></p>
+                        <div class="mb-2"><label class="form-label small">Role</label><select class="form-select" id="editUserRole"><option value="staff">Staff</option><option value="manager">Manager</option><option value="admin">Admin</option></select></div>
+                        <div id="editUserError" class="text-danger small" style="display:none"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-danger me-auto" id="removeUserBtn"><i class="bi bi-person-dash"></i> Remove access</button>
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-brand">Save changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Receipt Modal -->
+    <div class="modal fade" id="receiptModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">Receipt</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body" id="receiptBody"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger admin-only" id="voidSaleBtn"><i class="bi bi-x-circle"></i> Void sale</button>
+                    <button type="button" class="btn btn-outline-secondary" id="printReceiptBtn"><i class="bi bi-printer me-1"></i> Print</button>
+                    <button type="button" class="btn btn-outline-secondary" id="returnSaleBtn"><i class="bi bi-arrow-return-left me-1"></i> Return / Refund</button>
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Note Modal -->
+    <div class="modal fade" id="addNoteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="addNoteForm">
+                    <div class="modal-header"><h5 class="modal-title">Add note</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-body">
+                        <div class="mb-2"><label class="form-label small">Title</label><input type="text" class="form-control" id="noteTitle" required placeholder="Brief title…" /></div>
+                        <div class="mb-2"><label class="form-label small">Content</label><textarea class="form-control" id="noteContent" rows="4" required placeholder="Write your note here…"></textarea></div>
+                        <div id="addNoteError" class="text-danger small" style="display:none"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-brand" id="addNoteSubmitBtn">Save note</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div class="modal fade" id="confirmModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title" id="confirmModalTitle">Are you sure?</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body" id="confirmModalBody">This action cannot be undone.</div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmModalActionBtn">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Password Confirm Modal for Delete All Data -->
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i> Delete All Data</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <p class="text-danger fw-bold">This will permanently delete ALL data:</p>
+                    <ul class="small">
+                        <li>All products</li>
+                        <li>All sales records</li>
+                        <li>All stock movements</li>
+                        <li>All notes</li>
+                        <li>All user accounts (except yours)</li>
+                        <li>All activity logs</li>
+                        <li>All system settings</li>
+                    </ul>
+                    <p class="text-muted small">Enter your password to confirm this irreversible action.</p>
+                    <div class="mb-2">
+                        <label class="form-label small">Your password</label>
+                        <input type="password" class="form-control" id="deleteConfirmPassword" placeholder="Enter your account password" />
+                    </div>
+                    <div id="deleteConfirmError" class="text-danger small" style="display:none"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="deleteConfirmActionBtn"><i class="bi bi-trash3 me-1"></i> Permanently Delete Everything</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js">
+    </script>
+    <script src="script.js"></script>
+    <script src="barcode.js"></script>
+</body>
+</html>
