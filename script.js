@@ -1854,19 +1854,23 @@ async function openBarcodeScanner() {
     const modal = new bootstrap.Modal(modalEl);
     const readerEl = document.getElementById("barcodeReader");
 
+    // ─── Add close button to the overlay ───────────────────────────
     readerEl.innerHTML = `
-            <div class="scanner-overlay">
-              <div class="corner tl"></div>
-              <div class="corner tr"></div>
-              <div class="corner bl"></div>
-              <div class="corner br"></div>
-              <div class="scan-line"></div>
-              <div class="scanner-flash"></div>
-            </div>
-            <div class="scanner-status">
-              <i class="bi bi-upc-scan"></i> HD Scanning <span class="pulse"></span>
-            </div>
-          `;
+        <div class="scanner-overlay">
+            <div class="corner tl"></div>
+            <div class="corner tr"></div>
+            <div class="corner bl"></div>
+            <div class="corner br"></div>
+            <div class="scan-line"></div>
+            <div class="scanner-flash"></div>
+            <button class="scanner-close-btn" data-bs-dismiss="modal" aria-label="Close scanner">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="scanner-status">
+            <i class="bi bi-upc-scan"></i> HD Scanning <span class="pulse"></span>
+        </div>
+    `;
 
     modal.show();
     await new Promise(resolve => {
@@ -1917,10 +1921,21 @@ async function openBarcodeScanner() {
 
     let beepThrottle = false;
     let isProcessing = false;
+    // ─── Cooldown map: prevent duplicate scans of the same barcode ──
+    const lastScanned = {};
 
     const onSuccess = async (decodedText) => {
         if (isProcessing) return;
         isProcessing = true;
+
+        const key = decodedText.trim().toLowerCase();
+        const now = Date.now();
+        // Ignore if the same barcode was scanned within the last 500ms
+        if (lastScanned[key] && (now - lastScanned[key] < 500)) {
+            isProcessing = false;
+            return;
+        }
+        lastScanned[key] = now;
 
         if (!beepThrottle) {
             playScanBeep();
@@ -1950,9 +1965,11 @@ async function openBarcodeScanner() {
             showToast(`🔍 Scanned: "${decodedText}" – no SKU match`, 'warning');
         }
 
-        try { await reader.stop(); } catch (_) {}
-        modal.hide();
-        isProcessing = false;
+        // ─── Scanner stays open – DO NOT stop or hide ──────────────
+        // Allow next scan after a short cooldown
+        setTimeout(() => {
+            isProcessing = false;
+        }, 200);
     };
 
     const onError = (err) => {};
@@ -2011,15 +2028,17 @@ async function openBarcodeScanner() {
         }
     }
 
+    // Clean up when modal is closed (by the close button or other means)
     modalEl.addEventListener('hidden.bs.modal', () => {
         observer.disconnect();
         try { reader.stop(); } catch (_) {}
         try { reader.clear(); } catch (_) {}
         readerEl.innerHTML = '';
         readerEl.style.minHeight = '';
+        // Clear cooldown map
+        for (let key in lastScanned) delete lastScanned[key];
     }, { once: true });
 }
-
 function loadScript(src) {
     return new Promise((resolve, reject) => {
         const script = document.createElement('script');
