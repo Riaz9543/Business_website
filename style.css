@@ -1373,6 +1373,34 @@
                 transform: scale(0.7);
             }
         }
+/* Scanner close button */
+.scanner-close-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 25;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+    backdrop-filter: blur(4px);
+    pointer-events: auto;
+}
+.scanner-close-btn:hover {
+    background: rgba(255, 0, 0, 0.6);
+    transform: scale(1.05);
+}
+.scanner-close-btn:active {
+    transform: scale(0.95);
+}
 
         /* ===== Investment highlight ===== */
         .investment-highlight {
