@@ -1,7 +1,7 @@
 
         /* =========================================================================
-           StockLedger — refined design system (unchanged)
-           ========================================================================= */
+               StockLedger — refined design system
+               ========================================================================= */
 
         /* ===== CSS Variables ===== */
         :root {
@@ -1373,34 +1373,34 @@
                 transform: scale(0.7);
             }
         }
-/* Scanner close button */
-.scanner-close-btn {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    z-index: 25;
-    background: rgba(0, 0, 0, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 50%;
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    font-size: 1.2rem;
-    cursor: pointer;
-    transition: background 0.2s, transform 0.15s;
-    backdrop-filter: blur(4px);
-    pointer-events: auto;
-}
-.scanner-close-btn:hover {
-    background: rgba(255, 0, 0, 0.6);
-    transform: scale(1.05);
-}
-.scanner-close-btn:active {
-    transform: scale(0.95);
-}
+        /* Scanner close button */
+        .scanner-close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 25;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.15s;
+            backdrop-filter: blur(4px);
+            pointer-events: auto;
+        }
+        .scanner-close-btn:hover {
+            background: rgba(255, 0, 0, 0.6);
+            transform: scale(1.05);
+        }
+        .scanner-close-btn:active {
+            transform: scale(0.95);
+        }
 
         /* ===== Investment highlight ===== */
         .investment-highlight {
@@ -1751,4 +1751,43 @@
         .chart-wrap-dark canvas {
             border-radius: var(--radius-sm);
         }
-    
+
+        /* ===== Chart Tooltip ===== */
+        .chart-tooltip {
+            position: fixed;
+            padding: 8px 14px;
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-lg);
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--ink);
+            pointer-events: none;
+            z-index: 9999;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            font-family: 'Inter', system-ui, sans-serif;
+            max-width: 220px;
+            backdrop-filter: blur(4px);
+        }
+        .chart-tooltip.visible {
+            display: block;
+            opacity: 1;
+        }
+        .chart-tooltip .tt-date {
+            font-weight: 400;
+            color: var(--ink-soft);
+            font-size: 11px;
+        }
+        .chart-tooltip .tt-value {
+            font-weight: 700;
+            color: var(--brand-dark);
+        }
+        [data-bs-theme="dark"] .chart-tooltip .tt-value {
+            color: var(--brand-light);
+        }
+#lowstock{
+  
+}
