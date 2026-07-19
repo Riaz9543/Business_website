@@ -1,7 +1,7 @@
-// barcode.js – HD Scanner with continuous multi‑scan support (stays open)
-// Now includes 1.5s cooldown and duplicate‑in‑cart prevention.
+<!-- barcode.js – HD Scanner with continuous multi‑scan support (stays open) -->
+<!-- Now includes 1.5s cooldown and duplicate‑in‑cart prevention. -->
 
-// Helper to load script dynamically
+<!-- Helper to load script dynamically -->
 function loadScript(src) {
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
@@ -12,20 +12,25 @@ function loadScript(src) {
   });
 }
 
-// Beep sound using Web Audio
-function playBeep() {
+<!-- Beep sound using Web Audio – Synthesizing the shop scanner beep sound from the video -->
+function playBeep(freq = 1100, duration = 80, count = 1) {
   try {
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    oscillator.frequency.value = 880;
-    oscillator.type = 'sine';
-    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
-    oscillator.start(audioCtx.currentTime);
-    oscillator.stop(audioCtx.currentTime + 0.2);
+    let times = 0;
+    const play = () => {
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      oscillator.frequency.value = freq;
+      oscillator.type = 'sine';
+      gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration / 1000);
+      oscillator.start(audioCtx.currentTime + (times * (duration + 50)) / 1000);
+      oscillator.stop(audioCtx.currentTime + (times * (duration + 50) + duration) / 1000);
+      times++;
+    };
+    for (let i = 0; i < count; i++) setTimeout(play, i * (duration + 50));
   } catch (e) {
     // Silent fail if audio not supported
   }
@@ -112,7 +117,6 @@ async function openBarcodeScanner() {
     observer.observe(readerEl, { childList: true, subtree: true });
     setTimeout(styleVideo, 300);
 
-    let beepThrottle = false;
     let isProcessing = false;
     const lastScanned = {};
 
@@ -130,14 +134,6 @@ async function openBarcodeScanner() {
         }
         lastScanned[key] = now;
 
-        if (!beepThrottle) {
-            playScanBeep();
-            flashScanner(readerEl);
-            if (navigator.vibrate) navigator.vibrate(30);
-            beepThrottle = true;
-            setTimeout(() => { beepThrottle = false; }, 300);
-        }
-
         const product = state.products.find(p =>
             p.sku && p.sku.toLowerCase() === decodedText.trim().toLowerCase()
         );
@@ -148,13 +144,19 @@ async function openBarcodeScanner() {
                 const existing = state.cart.find(c => c.productId === product.id);
                 if (existing) {
                     showToast(`⚠️ ${product.name} already in cart`, 'warning');
+                    playBeep(400, 250, 1);   // Fail sound (Low pitch error beep)
                 } else {
                     addToCart(product.id);
                     showToast(`✅ ${product.name} added (${fmtMoney(product.price)})`, 'success');
+                    
+                    // Success: Visual flash + haptic vibration + single scanner beep
+                    flashScanner(readerEl);
+                    if (navigator.vibrate) navigator.vibrate(30);
+                    playBeep(1100, 80, 1);   // High-pitched single barcode scan beep
                 }
-                // Scanner stays open – user can scan another product
             } else {
                 showToast(`❌ ${product.name} is out of stock`, 'error');
+                playBeep(400, 250, 1);       // Fail sound (Low pitch error beep)
             }
         } else {
             const posSearch = document.getElementById('posSearch');
@@ -163,9 +165,10 @@ async function openBarcodeScanner() {
                 posSearch.dispatchEvent(new Event('input'));
             }
             showToast(`🔍 Scanned: "${decodedText}" – no SKU match`, 'warning');
+            playBeep(400, 250, 1);           // Fail sound (Low pitch error beep)
         }
 
-        // ─── Wait 1.5 seconds before allowing the next scan ──────
+        // ─── Wait 1 second before allowing the next scan ──────
         setTimeout(() => {
             isProcessing = false;
         }, 1000);
