@@ -4,22 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>StockLedger — Inventory & Sales</title>
-
-    <!-- Bootstrap 5 -->
+    <link rel="icon" href="https://favicon.io/emoji-favicons/box/" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
-
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="icon" type="image/x-icon" href="https://www.google.com/favicon.ico">
-    <link href="style.css" rel="stylesheet"></>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-
-    <!-- Chart.js (kept for revenue chart only) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js">
     </script>
-
-    <!-- Firebase v10 compat -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js">
     </script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js">
@@ -28,7 +19,7 @@
     </script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js">
     </script>
-
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -97,6 +88,9 @@
                 <a class="nav-link admin-only" data-view="users"><i class="bi bi-people"></i> User Management</a>
                 <a class="nav-link admin-only" data-view="settings"><i class="bi bi-gear"></i> System Settings</a>
                 <a class="nav-link admin-only" data-view="activity"><i class="bi bi-clock-history"></i> Activity Log</a>
+
+                <div class="nav-section-label">Information</div>
+                <a class="nav-link" data-view="about"><i class="bi bi-info-circle"></i> About / Contact</a>
             </nav>
             <div class="sidebar-foot">
                 <span>Signed in as <span id="sidebarUserName">—</span></span>
@@ -257,10 +251,10 @@
                     </div>
 
                     <!-- Low stock watchlist + Stock movement summary (now date‑range aware) -->
-                    <div class="row mt-3">
-                        <div class="col-lg-4">
-                            <div class="panel h-100">
-                                <div class="panel-head"><h5><i class="bi bi-exclamation-diamond me-2 text-warning"></i>Low stock watchlist</h5></div>
+                    <div class="row mt-3 ">
+                        <div class="col-lg-4 mb-3 mb-lg-0">
+                            <div class="panel h-100 low-stock-panel">
+                                <div id="lowstock" class="panel-head"><h5><i class="bi bi-exclamation-diamond me-2 text-warning"></i>Low stock watchlist</h5></div>
                                 <div class="panel-body p-0" id="dashLowStockList" style="max-height:300px;overflow-y:auto">
                                     <div class="empty-state py-4"><i class="bi bi-check2-circle"></i>All stock levels look healthy.</div>
                                 </div>
@@ -566,7 +560,15 @@
                         <div class="panel-head"><h5><i class="bi bi-cash-coin me-2 text-success"></i>Investment breakdown</h5></div>
                         <div class="panel-body table-responsive">
                             <table class="table app-table">
-                                <thead><tr><th>Product</th><th class="num">Stock</th><th class="num">Unit Cost</th><th class="num">Total Investment</th></tr></thead>
+                                <thead>
+                                    <tr>
+                                        <th>Product</th>
+                                        <th class="num">Qty received</th>
+                                        <th class="num">Stock</th>
+                                        <th class="num">Unit Cost</th>
+                                        <th class="num">Total Investment</th>
+                                    </tr>
+                                </thead>
                                 <tbody id="investmentBreakdownBody"></tbody>
                             </table>
                             <div class="empty-state" id="investmentBreakdownEmpty" style="display:none"><i class="bi bi-cash-stack"></i>No products with cost data.</div>
@@ -630,6 +632,98 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- ============================================================ -->
+                <!-- ===== NEW: ABOUT / CONTACT ===== -->
+                <!-- ============================================================ -->
+                <div class="app-view" id="view-about">
+                    <div class="panel" style="max-width:680px;margin:0 auto;">
+                        <div class="panel-head">
+                            <h5><i class="bi bi-info-circle me-2 text-success"></i>About &amp; Contact</h5>
+                        </div>
+                        <div class="panel-body">
+                            <div class="text-center mb-4">
+                                <div class="avatar-lg" style="width:80px;height:80px;border-radius:50%;background:var(--brand-gradient);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:2rem;font-weight:700;box-shadow:0 8px 24px rgba(var(--brand-rgb),0.35);margin-bottom:0.5rem;">
+                                    R
+                                </div>
+                                <h5 class="fw-bold" style="margin-bottom:0.15rem;">Riaz</h5>
+                                <p class="text-muted small">Full-stack Developer</p>
+                            </div>
+
+                            <div class="row g-3">
+                                <!-- Facebook -->
+                                <div class="col-12 col-md-6">
+                                    <div class="contact-card" style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;border:1px solid var(--line);border-radius:var(--radius-sm);transition:background 0.15s,border-color 0.15s;cursor:pointer;" onmouseover="this.style.borderColor='var(--brand)'" onmouseout="this.style.borderColor='var(--line)'" onclick="window.open('https://www.facebook.com/riaz.programer','_blank')">
+                                        <div style="width:36px;height:36px;border-radius:50%;background:#1877f2;color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">
+                                            <i class="bi bi-facebook"></i>
+                                        </div>
+                                        <div>
+                                            <div class="small text-muted" style="font-size:0.65rem;">Facebook</div>
+                                            <div class="fw-semibold" style="font-size:0.85rem;">/riaz.programer</div>
+                                        </div>
+                                        <div class="ms-auto text-muted"><i class="bi bi-box-arrow-up-right"></i></div>
+                                    </div>
+                                </div>
+
+                                <!-- Email -->
+                                <div class="col-12 col-md-6">
+                                    <div class="contact-card" style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;border:1px solid var(--line);border-radius:var(--radius-sm);transition:background 0.15s,border-color 0.15s;cursor:pointer;" onmouseover="this.style.borderColor='var(--brand)'" onmouseout="this.style.borderColor='var(--line)'" onclick="window.location.href='mailto:amd175810@gmail.com'">
+                                        <div style="width:36px;height:36px;border-radius:50%;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">
+                                            <i class="bi bi-envelope"></i>
+                                        </div>
+                                        <div>
+                                            <div class="small text-muted" style="font-size:0.65rem;">Email</div>
+                                            <div class="fw-semibold" style="font-size:0.85rem;">amd175810@gmail.com</div>
+                                        </div>
+                                        <div class="ms-auto text-muted"><i class="bi bi-box-arrow-up-right"></i></div>
+                                    </div>
+                                </div>
+
+                                <!-- Phone 1 -->
+                                <div class="col-12 col-md-6">
+                                    <div class="contact-card" style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;border:1px solid var(--line);border-radius:var(--radius-sm);transition:background 0.15s,border-color 0.15s;cursor:pointer;" onmouseover="this.style.borderColor='var(--brand)'" onmouseout="this.style.borderColor='var(--line)'" onclick="window.location.href='tel:01811666315'">
+                                        <div style="width:36px;height:36px;border-radius:50%;background:var(--amber);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">
+                                            <i class="bi bi-phone"></i>
+                                        </div>
+                                        <div>
+                                            <div class="small text-muted" style="font-size:0.65rem;">Phone (Primary)</div>
+                                            <div class="fw-semibold" style="font-size:0.85rem;">01811 666 315</div>
+                                        </div>
+                                        <div class="ms-auto text-muted"><i class="bi bi-box-arrow-up-right"></i></div>
+                                    </div>
+                                </div>
+
+                                <!-- Phone 2 -->
+                                <div class="col-12 col-md-6">
+                                    <div class="contact-card" style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;border:1px solid var(--line);border-radius:var(--radius-sm);transition:background 0.15s,border-color 0.15s;cursor:pointer;" onmouseover="this.style.borderColor='var(--brand)'" onmouseout="this.style.borderColor='var(--line)'" onclick="window.location.href='tel:01936244635'">
+                                        <div style="width:36px;height:36px;border-radius:50%;background:var(--info);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">
+                                            <i class="bi bi-phone"></i>
+                                        </div>
+                                        <div>
+                                            <div class="small text-muted" style="font-size:0.65rem;">Phone (Secondary)</div>
+                                            <div class="fw-semibold" style="font-size:0.85rem;">01936 244 635</div>
+                                        </div>
+                                        <div class="ms-auto text-muted"><i class="bi bi-box-arrow-up-right"></i></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr style="border-color:var(--line);margin:1.5rem 0;" />
+
+                            <div class="text-center">
+                                <p class="small text-muted" style="margin-bottom:0.25rem;">
+                                    <i class="bi bi-heart-fill" style="color:var(--danger);"></i>
+                                    Built with care — StockLedger v2.0
+                                </p>
+                                <p class="small text-muted" style="font-size:0.7rem;">
+                                    &copy; 2026 Riaz. All rights reserved.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- ===== END ABOUT / CONTACT ===== -->
+
             </div>
         </div>
     </div>
@@ -762,7 +856,7 @@
                         <div class="row g-2 mb-2" id="perUnitPriceRow">
                             <div class="col-6">
                                 <label class="form-label small">Unit price <span id="stockLogPriceLabel">(cost price)</span></label>
-                                <input type="number" min="0" step="0.01" class="form-control stock-log-price-input" id="stockLogPrice" placeholder="0.00" />
+                                <input type="number" required min="0" step="0.01" class="form-control stock-log-price-input" id="stockLogPrice" placeholder="0.00" />
                             </div>
                             <div class="col-6">
                                 <label class="form-label small">New stock after</label>
@@ -938,10 +1032,16 @@
         </div>
     </div>
 
+    <!-- Chart Tooltip (floating) -->
+    <div class="chart-tooltip" id="chartTooltip">
+        <div class="tt-date"></div>
+        <div class="tt-value"></div>
+    </div>
+
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js">
     </script>
-    <script src="script.js"></script>
-    <script src="barcode.js"></script>
+  <script src="script.js"></script>
+  <script src="barcode.js"></script>
 </body>
 </html>
